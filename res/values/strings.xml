@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">SettingsSample</string>
+    <string name="activity_name">SettingsActivity</string>
+    <string name="provider_name">SettingsProvider</string>
+
+    <string name="apple">APPLE</string>
+    <string name="orange">ORANGE</string>
+    <string name="banana">BANANA</string>
+
+</resources>
