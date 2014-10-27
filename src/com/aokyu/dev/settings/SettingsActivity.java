@@ -23,13 +23,16 @@ import android.widget.EditText;
 import android.widget.Spinner;
 
 public class SettingsActivity extends Activity
-    implements OnSharedPreferenceChangeListener, OnItemSelectedListener {
+    implements OnSharedPreferenceChangeListener {
 
     private Context mContext;
     private SharedPreferences mPreferences;
 
-    private Spinner mSpinner;
-    private EditText mEdit;
+    private Spinner mFruitSpinner;
+    private EditText mFruitEdit;
+
+    private Spinner mNumberSpinner;
+    private EditText mNumberEdit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,14 +41,51 @@ public class SettingsActivity extends Activity
 
         mContext = getApplicationContext();
         mPreferences = Settings.getInstance(mContext);
+        Resources res = mContext.getResources();
 
-        mSpinner = (Spinner) findViewById(R.id.fruit_spinner);
-        mSpinner.setOnItemSelectedListener(this);
-        mEdit = (EditText) findViewById(R.id.fruit_edit);
+        mFruitSpinner = (Spinner) findViewById(R.id.fruit_spinner);
+        mFruitSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
 
-        String defaultValue = mContext.getString(R.string.apple);
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                Resources res = mContext.getResources();
+                String[] names = res.getStringArray(R.array.fruit_names);
+                mPreferences.edit()
+                    .putString(SettingKey.KEY_SETTING_FRUIT, names[position])
+                    .apply();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+
+        });
+        mFruitEdit = (EditText) findViewById(R.id.fruit_edit);
+
+        String defaultValue = res.getString(R.string.apple);
         String value = mPreferences.getString(SettingKey.KEY_SETTING_FRUIT, defaultValue);
-        mEdit.setText(value);
+        mFruitEdit.setText(value);
+
+        mNumberSpinner = (Spinner) findViewById(R.id.number_spinner);
+        mNumberSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                Resources res = mContext.getResources();
+                String[] numbers = res.getStringArray(R.array.numbers);
+                mPreferences.edit()
+                    .putString(SettingKey.KEY_SETTING_NUMBER, numbers[position])
+                    .apply();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+
+        });
+        mNumberEdit = (EditText) findViewById(R.id.number_edit);
+
+        String defaultNumber = res.getString(R.string.number_three);
+        String number = mPreferences.getString(SettingKey.KEY_SETTING_NUMBER, defaultNumber);
+        mNumberEdit.setText(number);
     }
 
     @Override
@@ -62,23 +102,19 @@ public class SettingsActivity extends Activity
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        if (!TextUtils.isEmpty(key) && key.equals(SettingKey.KEY_SETTING_FRUIT)) {
-            String defaultValue = mContext.getString(R.string.apple);
+        if (TextUtils.isEmpty(key)) {
+            return;
+        }
+
+        Resources res = mContext.getResources();
+        if (key.equals(SettingKey.KEY_SETTING_FRUIT)) {
+            String defaultValue = res.getString(R.string.apple);
             String value = mPreferences.getString(SettingKey.KEY_SETTING_FRUIT, defaultValue);
-            mEdit.setText(value);
+            mFruitEdit.setText(value);
+        } else if (key.equals(SettingKey.KEY_SETTING_NUMBER)) {
+            String defaultValue = res.getString(R.string.number_three);
+            String value = mPreferences.getString(SettingKey.KEY_SETTING_NUMBER, defaultValue);
+            mNumberEdit.setText(value);
         }
     }
-
-    @Override
-    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        Resources res = mContext.getResources();
-        String[] names = res.getStringArray(R.array.fruit_names);
-        mPreferences.edit()
-            .putString(SettingKey.KEY_SETTING_FRUIT, names[position])
-            .apply();
-    }
-
-    @Override
-    public void onNothingSelected(AdapterView<?> parent) {}
-
 }

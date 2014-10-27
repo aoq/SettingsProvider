@@ -9,4 +9,8 @@
     <string name="orange">ORANGE</string>
     <string name="banana">BANANA</string>
 
+    <string name="number_three">3</string>
+    <string name="number_five">5</string>
+    <string name="number_seven">7</string>
+
 </resources>

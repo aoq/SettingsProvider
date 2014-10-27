@@ -20,14 +20,18 @@ import java.io.ObjectOutputStream;
 
 /* package */ class Setting {
 
+    public static final long NO_ID = -1;
+
     private static final int TRUE = 1;
     private static final int FALSE = 0;
 
+    private long mId = NO_ID;
     private String mKey;
     private String mType;
     private Object mValue;
 
     public Setting(ContentValues values) {
+        mId = values.getAsLong(SettingsContract._ID);
         mKey = values.getAsString(SettingsContract.KEY);
         mType = values.getAsString(SettingsContract.TYPE);
         if (mType.equals(Boolean.class.getName())) {
@@ -103,6 +107,10 @@ import java.io.ObjectOutputStream;
         Class<?> clazz = value.getClass();
         mType = clazz.getName();
         mValue = value;
+    }
+
+    /* package */ long getId() {
+        return mId;
     }
 
     public String getKey() {

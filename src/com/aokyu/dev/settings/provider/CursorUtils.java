@@ -31,7 +31,11 @@ public class CursorUtils {
                 int type = cursor.getType(i);
                 switch (type) {
                     case Cursor.FIELD_TYPE_FLOAT:
+                        values.put(columns[i], cursor.getFloat(i));
+                        break;
                     case Cursor.FIELD_TYPE_INTEGER:
+                        values.put(columns[i], cursor.getInt(i));
+                        break;
                     case Cursor.FIELD_TYPE_STRING:
                         values.put(columns[i], cursor.getString(i));
                         break;

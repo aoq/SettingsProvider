@@ -38,15 +38,11 @@ public class MemoryCursor extends AbstractWindowedCursor {
     }
 
     public void fillFromCursor(Cursor cursor) {
-        // "Resource leak" is displayed in Coverity,
-        // but getwindow() does not need to close here.
         cursorFillWindow(cursor, 0, getWindow());
     }
 
     @Override
     public int getCount() {
-        // "Resource leak" is displayed in Coverity,
-        // but getwindow() does not need to close here.
         return getWindow().getNumRows();
     }
 
@@ -94,7 +90,8 @@ public class MemoryCursor extends AbstractWindowedCursor {
                                     : window.putNull(position, i);
                             break;
                         }
-                        default: // assume value is convertible to String
+                        default:
+                            // Assume that the value is convertible to String.
                         case Cursor.FIELD_TYPE_STRING: {
                             final String value = cursor.getString(i);
                             success = value != null ? window.putString(value, position, i)

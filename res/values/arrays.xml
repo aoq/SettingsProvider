@@ -5,4 +5,10 @@
         <item>@string/orange</item>
         <item>@string/banana</item>
     </string-array>
+
+    <string-array name="numbers">
+        <item>@string/number_three</item>
+        <item>@string/number_five</item>
+        <item>@string/number_seven</item>
+    </string-array>
 </resources>

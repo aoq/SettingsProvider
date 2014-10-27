@@ -7,6 +7,7 @@
 
 package com.aokyu.dev.settings.provider;
 
+import com.aokyu.dev.settings.provider.SettingsCache.CacheListener;
 import com.aokyu.dev.settings.provider.task.AbstractTask;
 import com.aokyu.dev.settings.provider.task.SerialExecutor;
 
@@ -16,14 +17,12 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.OperationApplicationException;
 import android.content.SharedPreferences;
-import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Handler;
 import android.os.RemoteException;
+import android.text.TextUtils;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,36 +44,9 @@ public class Settings implements SharedPreferences {
     private static volatile SerialExecutor sExecutor = new SerialExecutor(TASK_NAME);
 
     private Context mContext;
-    private ContentResolver mContentResolver;
+    private SettingsCache mCache;
 
     private SettingsChangeListeners mChangeListeners;
-
-    private static final String[] PROJECTION = {
-        SettingsContract._ID,
-        SettingsContract.KEY,
-        SettingsContract.TYPE,
-        SettingsContract.VALUE
-    };
-
-    private static final class SettingLoader {
-
-        private static final String SELECTION = SettingsContract.KEY + "=?";
-        private static final String SORT_ORDER = SettingsContract._ID + " DESC LIMIT 1";
-
-        public static Cursor load(ContentResolver resolver, String key) {
-            return resolver.query(SettingsContract.CONTENT_URI, PROJECTION,
-                    SELECTION, new String[] { key }, SORT_ORDER);
-        }
-
-        public static Cursor load(ContentResolver resolver, Uri settingUri) {
-            return resolver.query(settingUri, PROJECTION, null, null, SORT_ORDER);
-        }
-
-        public static Cursor loadAll(ContentResolver resolver) {
-            return resolver.query(SettingsContract.CONTENT_URI, PROJECTION,
-                    null, null, null);
-        }
-    }
 
     public static SharedPreferences getInstance(Context context) {
         if (sHelper == null) {
@@ -87,14 +59,16 @@ public class Settings implements SharedPreferences {
 
     private Settings(Context context) {
         mContext = context;
-        mContentResolver = mContext.getContentResolver();
+        mCache = new SettingsCache(mContext);
         mChangeListeners = new SettingsChangeListeners(mContext, this);
+        mCache.addCacheListener(mChangeListeners);
     }
 
     @Override
     protected void finalize() throws Throwable {
         // Just in case some objects are not release.
         try {
+            mCache.destroy();
             mChangeListeners.destroy();
         } finally {
             super.finalize();
@@ -113,76 +87,24 @@ public class Settings implements SharedPreferences {
 
     @Override
     public boolean contains(String key) {
-        Cursor cursor = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return false;
-            }
-
-            if (cursor.moveToNext()) {
-                return true;
-            } else {
-                return false;
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
+        return mCache.contains(key);
     }
 
     @Override
     public Map<String, ?> getAll() {
-        Map<String, Object> map = new HashMap<String, Object>();
-        Cursor cursor = null;
-        try {
-            cursor = SettingLoader.loadAll(mContentResolver);
-            if (cursor == null) {
-                return map;
-            }
-
-            while (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                Setting setting = new Setting(values);
-                String key = setting.getKey();
-                Object value = setting.getValue();
-                map.put(key, value);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
-        return map;
+        return mCache.getAllAsMap();
     }
 
     @Override
     public boolean getBoolean(String key, boolean defValue) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValue;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            Boolean value = (Boolean) setting.getValue();
-            return value.booleanValue();
+            Object value = setting.getValue();
+            if (value instanceof Boolean) {
+                return (Boolean) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValue;
         }
@@ -190,28 +112,14 @@ public class Settings implements SharedPreferences {
 
     @Override
     public float getFloat(String key, float defValue) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValue;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            Float value = (Float) setting.getValue();
-            return value.floatValue();
+            Object value = setting.getValue();
+            if (value instanceof Float) {
+                return (Float) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValue;
         }
@@ -219,28 +127,14 @@ public class Settings implements SharedPreferences {
 
     @Override
     public int getInt(String key, int defValue) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValue;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            Integer value = (Integer) setting.getValue();
-            return value.intValue();
+            Object value = setting.getValue();
+            if (value instanceof Integer) {
+                return (Integer) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValue;
         }
@@ -248,28 +142,14 @@ public class Settings implements SharedPreferences {
 
     @Override
     public long getLong(String key, long defValue) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValue;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            Long value = (Long) setting.getValue();
-            return value.longValue();
+            Object value = setting.getValue();
+            if (value instanceof Long) {
+                return (Long) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValue;
         }
@@ -277,28 +157,14 @@ public class Settings implements SharedPreferences {
 
     @Override
     public String getString(String key, String defValue) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValue;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            String value = (String) setting.getValue();
-            return value;
+            Object value = setting.getValue();
+            if (value instanceof String) {
+                return (String) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValue;
         }
@@ -307,58 +173,32 @@ public class Settings implements SharedPreferences {
     @SuppressWarnings("unchecked")
     @Override
     public Set<String> getStringSet(String key, Set<String> defValues) {
-        Cursor cursor = null;
-        Setting setting = null;
-        try {
-            cursor = SettingLoader.load(mContentResolver, key);
-            if (cursor == null) {
-                return defValues;
-            }
-
-            if (cursor.moveToNext()) {
-                ContentValues values = new ContentValues();
-                CursorUtils.cursorRowToContentValues(cursor, values);
-                setting = new Setting(values);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-
+        Setting setting = mCache.get(key);
         if (setting != null) {
-            Set<String> value = (Set<String>) setting.getValue();
-            return value;
+            Object value = setting.getValue();
+            if (value instanceof Set<?>) {
+                return (Set<String>) value;
+            } else {
+                throw new IllegalStateException("setting is " + setting.getClass());
+            }
         } else {
             return defValues;
         }
     }
 
-    public static final class SettingsChangeListeners extends ContentObserver {
-
-        private ContentResolver mContentResolver;
+    public static final class SettingsChangeListeners implements CacheListener {
 
         private SharedPreferences mPreferences;
-
-        private Object mRegistrationLock = new Object();
-        private boolean mRegistered = false;
 
         private List<OnSharedPreferenceChangeListener> mListeners =
                 new CopyOnWriteArrayList<OnSharedPreferenceChangeListener>();
 
         public SettingsChangeListeners(Context context, SharedPreferences prefs) {
-            // Callbacks will be called on the main thread.
-            super(new Handler(context.getMainLooper()));
-            mContentResolver = context.getContentResolver();
             mPreferences = prefs;
         }
 
         public void destroy() {
             mListeners.clear();
-            if (mRegistered) {
-                mContentResolver.unregisterContentObserver(this);
-                mRegistered = false;
-            }
         }
 
         public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener l) {
@@ -368,20 +208,6 @@ public class Settings implements SharedPreferences {
 
             if (!mListeners.contains(l)) {
                 mListeners.add(l);
-            }
-
-            if (!mListeners.isEmpty()) {
-                onRegistered();
-            }
-        }
-
-        private void onRegistered() {
-            synchronized (mRegistrationLock) {
-                if (!mRegistered) {
-                    mContentResolver.registerContentObserver(
-                            SettingsContract.CONTENT_URI, true, this);
-                    mRegistered = true;
-                }
             }
         }
 
@@ -393,52 +219,16 @@ public class Settings implements SharedPreferences {
             if (mListeners.contains(l)) {
                 mListeners.remove(l);
             }
-
-            if (mListeners.isEmpty()) {
-                onUnregistered();
-            }
-        }
-
-        private void onUnregistered() {
-            synchronized (mRegistrationLock) {
-                if (mRegistered) {
-                    mContentResolver.unregisterContentObserver(this);
-                    mRegistered = false;
-                }
-            }
         }
 
         @Override
-        public void onChange(boolean selfChange, Uri uri) {
-            if (uri == null) {
-                return;
-            }
+        public void onRemoved(Setting setting) {
+            dispatchSharedPreferenceChanged(setting);
+        }
 
-            String lastPath = uri.getLastPathSegment();
-            try {
-                Long.parseLong(lastPath);
-            } catch (NumberFormatException e) {
-                return;
-            }
-
-            Cursor cursor = null;
-            try {
-                cursor = SettingLoader.load(mContentResolver, uri);
-                if (cursor == null) {
-                    return;
-                }
-
-                if (cursor.moveToNext()) {
-                    ContentValues values = new ContentValues();
-                    CursorUtils.cursorRowToContentValues(cursor, values);
-                    Setting setting = new Setting(values);
-                    dispatchSharedPreferenceChanged(setting);
-                }
-            } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
-            }
+        @Override
+        public void onInsertedOrUpdated(Setting setting) {
+            dispatchSharedPreferenceChanged(setting);
         }
 
         private void dispatchSharedPreferenceChanged(Setting setting) {
@@ -451,41 +241,49 @@ public class Settings implements SharedPreferences {
 
     @Override
     public Editor edit() {
-        return new SettingsEditor(mContext, sExecutor);
+        return new SettingsEditor(mContext, this);
+    }
+
+    private void onApply(Commit commit) {
+        commit.cache(mCache);
+        sExecutor.execute(commit);
+    }
+
+    private boolean onCommit(Commit commit) {
+        try {
+            commit.cache(mCache);
+            commit.execute();
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
     }
 
     /**
      * Note that an edit for settings will be executed on a single worker thread
      * if using {@link #apply()}.
-     * In addition, you might not be able to get the edited settings immediately
-     * because the edit will be executed asynchronously.
      */
     private static final class SettingsEditor implements Editor {
 
         private Context mContext;
-        private SerialExecutor mExecutor;
+        private Settings mSettings;
 
         private Commit mCommit;
 
-        public SettingsEditor(Context context, SerialExecutor executor) {
+        public SettingsEditor(Context context, Settings settings) {
             mContext = context;
-            mExecutor = executor;
+            mSettings = settings;
             mCommit = new Commit(context);
         }
 
         @Override
         public void apply() {
-            mExecutor.execute(mCommit);
+            mSettings.onApply(mCommit);
         }
 
         @Override
         public boolean commit() {
-            try {
-                mCommit.execute();
-            } catch (InterruptedException e) {
-                return false;
-            }
-            return true;
+            return mSettings.onCommit(mCommit);
         }
 
         @Override
@@ -554,6 +352,35 @@ public class Settings implements SharedPreferences {
                 mEdits.add(edit);
             } else if (edit instanceof Clear) {
                 mClear = (Clear) edit;
+            }
+        }
+
+        /**
+         * The cache operation should be executed on the same execution context as
+         * {@link Editor#apply()} or {@link Editor#commit()}.
+         */
+        public void cache(SettingsCache cache) {
+            if (mClear != null) {
+                cache.clear();
+            }
+
+            if (!mEdits.isEmpty()) {
+                for (Edit edit : mEdits) {
+                    if (edit instanceof InsertOrUpdate) {
+                        InsertOrUpdate operation = (InsertOrUpdate) edit;
+                        String key = operation.getKey();
+                        Object value = operation.getValue();
+                        if (!TextUtils.isEmpty(key)) {
+                            cache.put(key, value);
+                        }
+                    } else if (edit instanceof Remove) {
+                        Remove operation = (Remove) edit;
+                        String key = operation.getKey();
+                        if (!TextUtils.isEmpty(key)) {
+                            cache.remove(key);
+                        }
+                    }
+                }
             }
         }
 
@@ -637,6 +464,27 @@ public class Settings implements SharedPreferences {
             mValues = values;
         }
 
+        private String getKey() {
+            if (mValues != null) {
+                if (mValues.containsKey(SettingsContract.KEY)) {
+                    return mValues.getAsString(SettingsContract.KEY);
+                }
+            }
+
+            return null;
+        }
+
+        private Object getValue() {
+            if (mValues != null) {
+                if (mValues.containsKey(SettingsContract.VALUE)) {
+                    return mValues.get(SettingsContract.VALUE);
+                }
+            }
+
+            return null;
+        }
+
+
         public ContentProviderOperation buildOperation() {
             String key = mValues.getAsString(SettingsContract.KEY);
             Cursor cursor = null;
@@ -677,6 +525,11 @@ public class Settings implements SharedPreferences {
             super(context);
             mKey = key;
         }
+
+        private String getKey() {
+            return mKey;
+        }
+
 
         public ContentProviderOperation buildOperation() {
             String where = SettingsContract.KEY + "=?";
