@@ -13,19 +13,44 @@ import android.net.Uri;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-public class Transaction {
+/**
+ * A transaction for a database.
+ */
+/* package */ class Transaction {
 
+    /**
+     * Indicates whether this transaction is a batch operation.
+     */
     private final boolean mBatch;
     private List<SQLiteDatabase> mDatabasesForTransaction;
     private Map<String, SQLiteDatabase> mDatabaseMap;
+
+    /**
+     * Indicates whether this transaction has changed the databases.
+     */
     private boolean mDirty;
+
+    /**
+     * Indicates whether this transaction has not been yielded.
+     */
     private boolean mYieldFailed;
 
-    private List<Uri> mDirtyUris = new ArrayList<Uri>();
+    /**
+     * {@link Uri}s that have changed in this transaction.
+     * The hash code is calculated from a string representation of each {@link Uri}.
+     * @see Uri#hashCode()
+     */
+    private Set<Uri> mDirtyUris = new HashSet<Uri>();
 
+    /**
+     * Create a transaction.
+     * @param batch The flag that indicates whether this transaction is a batch operation.
+     */
     public Transaction(boolean batch) {
         mBatch = batch;
         mDatabasesForTransaction = new ArrayList<SQLiteDatabase>();
@@ -59,7 +84,7 @@ public class Transaction {
         markDirty();
     }
 
-    public List<Uri> getDirtyUris() {
+    public Set<Uri> getDirtyUris() {
         return mDirtyUris;
     }
 

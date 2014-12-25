@@ -8,6 +8,7 @@
 package com.aokyu.dev.settings.provider;
 
 import android.content.ContentValues;
+import android.database.Cursor;
 import android.text.TextUtils;
 
 import java.io.ByteArrayInputStream;
@@ -18,18 +19,88 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 
-/* package */ class Setting {
+/**
+ * This class holds a key-value pair.
+ */
+public class Setting {
 
+    /**
+     * Indicates this setting was not created from a record of the database.
+     */
     public static final long NO_ID = -1;
 
+    /**
+     * The integer representation of <code>true</code> to store boolean type values
+     * into a database.
+     */
     private static final int TRUE = 1;
+
+    /**
+     * The integer representation of <code>false</code> to store boolean type values
+     * into a database.
+     */
     private static final int FALSE = 0;
 
+    /**
+     * The unique ID for this setting.
+     */
     private long mId = NO_ID;
+
+    /**
+     * The key of this setting.
+     */
     private String mKey;
+
+    /**
+     * The value type of this setting.
+     */
     private String mType;
+
+    /**
+     * The value of this setting.
+     */
     private Object mValue;
 
+    /**
+     * Returns the {@link Setting} created from the current row of the {@link Cursor}.
+     * Note that null fields are not read out.
+     * @param cursor The {@link Cursor} indicating the row to convert a {@link Setting}.
+     * @return the {@link Setting} created from the current row of the {@link Cursor}.
+     */
+    public static Setting cursorRowToSetting(Cursor cursor) {
+        ContentValues values = new ContentValues();
+        String[] columns = cursor.getColumnNames();
+        int length = columns.length;
+        for (int i = 0; i < length; i++) {
+            if (!cursor.isNull(i)) {
+                int type = cursor.getType(i);
+                switch (type) {
+                    case Cursor.FIELD_TYPE_FLOAT:
+                        values.put(columns[i], cursor.getFloat(i));
+                        break;
+                    case Cursor.FIELD_TYPE_INTEGER:
+                        values.put(columns[i], cursor.getInt(i));
+                        break;
+                    case Cursor.FIELD_TYPE_STRING:
+                        values.put(columns[i], cursor.getString(i));
+                        break;
+                    case Cursor.FIELD_TYPE_BLOB:
+                        values.put(columns[i], cursor.getBlob(i));
+                        break;
+                    case Cursor.FIELD_TYPE_NULL:
+                    default:
+                        break;
+                }
+            }
+        }
+
+        return new Setting(values);
+    }
+
+    /**
+     * Creates a new setting from the {@link ContentValues}.
+     * @param values The {@link ContentValues}.
+     */
     public Setting(ContentValues values) {
         mId = values.getAsLong(SettingsContract._ID);
         mKey = values.getAsString(SettingsContract.KEY);
@@ -102,6 +173,11 @@ import java.io.ObjectOutputStream;
         return object;
     }
 
+    /**
+     * Creates a new setting for the key-value pair.
+     * @param key The key of this setting.
+     * @param value The value of this setting.
+     */
     public Setting(String key, Object value) {
         mKey = key;
         Class<?> clazz = value.getClass();
@@ -121,6 +197,10 @@ import java.io.ObjectOutputStream;
         return mValue;
     }
 
+    /**
+     * Returns a {@link ContentValues} for this setting.
+     * @return a {@link ContentValues} for this setting.
+     */
     public ContentValues toContentValues() {
         ContentValues values = new ContentValues();
         values.put(SettingsContract.KEY, mKey);
@@ -194,11 +274,27 @@ import java.io.ObjectOutputStream;
         }
     }
 
+    /**
+     * Compares the given key to the key of this setting.
+     * @param key The key to compare the key of this setting with.
+     * @return true if the given key is equal to the key of this setting.
+     */
     public boolean keyEquals(String key) {
         if (TextUtils.isEmpty(mKey)) {
             return false;
         } else {
             return mKey.equals(key);
         }
+    }
+
+    @Override
+    public String toString() {
+        String str = new StringBuilder()
+            .append("[")
+            .append("KEY=").append(mKey)
+            .append(", TYPE=").append(mType)
+            .append(", VALUE=").append(mValue)
+            .toString();
+        return str;
     }
 }

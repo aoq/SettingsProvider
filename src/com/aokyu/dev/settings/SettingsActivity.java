@@ -29,9 +29,11 @@ public class SettingsActivity extends Activity
     private SharedPreferences mPreferences;
 
     private Spinner mFruitSpinner;
+    private boolean mFruitInitialized = false;
     private EditText mFruitEdit;
 
     private Spinner mNumberSpinner;
+    private boolean mNumberInitialized = false;
     private EditText mNumberEdit;
 
     @Override
@@ -43,16 +45,23 @@ public class SettingsActivity extends Activity
         mPreferences = Settings.getInstance(mContext);
         Resources res = mContext.getResources();
 
+        String defaultValue = res.getString(R.string.apple);
+        String value = mPreferences.getString(SettingKey.KEY_SETTING_FRUIT, defaultValue);
         mFruitSpinner = (Spinner) findViewById(R.id.fruit_spinner);
+        mFruitSpinner.setSelection(getFruitIndex(value));
         mFruitSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Resources res = mContext.getResources();
-                String[] names = res.getStringArray(R.array.fruit_names);
-                mPreferences.edit()
-                    .putString(SettingKey.KEY_SETTING_FRUIT, names[position])
-                    .apply();
+                if (mFruitInitialized) {
+                    Resources res = mContext.getResources();
+                    String[] names = res.getStringArray(R.array.fruit_names);
+                    mPreferences.edit()
+                        .putString(SettingKey.KEY_SETTING_FRUIT, names[position])
+                        .apply();
+                } else {
+                    mFruitInitialized = true;
+                }
             }
 
             @Override
@@ -60,21 +69,25 @@ public class SettingsActivity extends Activity
 
         });
         mFruitEdit = (EditText) findViewById(R.id.fruit_edit);
-
-        String defaultValue = res.getString(R.string.apple);
-        String value = mPreferences.getString(SettingKey.KEY_SETTING_FRUIT, defaultValue);
         mFruitEdit.setText(value);
 
+        String defaultNumber = res.getString(R.string.number_three);
+        String number = mPreferences.getString(SettingKey.KEY_SETTING_NUMBER, defaultNumber);
         mNumberSpinner = (Spinner) findViewById(R.id.number_spinner);
+        mNumberSpinner.setSelection(getNumberIndex(number));
         mNumberSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Resources res = mContext.getResources();
-                String[] numbers = res.getStringArray(R.array.numbers);
-                mPreferences.edit()
-                    .putString(SettingKey.KEY_SETTING_NUMBER, numbers[position])
-                    .apply();
+                if (mNumberInitialized) {
+                    Resources res = mContext.getResources();
+                    String[] numbers = res.getStringArray(R.array.numbers);
+                    mPreferences.edit()
+                        .putString(SettingKey.KEY_SETTING_NUMBER, numbers[position])
+                        .apply();
+                } else {
+                    mNumberInitialized = true;
+                }
             }
 
             @Override
@@ -82,10 +95,35 @@ public class SettingsActivity extends Activity
 
         });
         mNumberEdit = (EditText) findViewById(R.id.number_edit);
-
-        String defaultNumber = res.getString(R.string.number_three);
-        String number = mPreferences.getString(SettingKey.KEY_SETTING_NUMBER, defaultNumber);
         mNumberEdit.setText(number);
+    }
+
+    private int getFruitIndex(String value) {
+        Resources res = mContext.getResources();
+        String[] names = res.getStringArray(R.array.fruit_names);
+        int index = 0;
+        for (String name : names) {
+            if (value.equals(name)) {
+                return index;
+            }
+            index++;
+        }
+
+        throw new IllegalStateException("illegal selection : " + value);
+    }
+
+    private int getNumberIndex(String number) {
+        Resources res = mContext.getResources();
+        String[] names = res.getStringArray(R.array.numbers);
+        int index = 0;
+        for (String name : names) {
+            if (number.equals(name)) {
+                return index;
+            }
+            index++;
+        }
+
+        throw new IllegalStateException("illegal selection : " + number);
     }
 
     @Override

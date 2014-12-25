@@ -11,6 +11,7 @@ import com.aokyu.dev.settings.provider.SettingsCache.CacheListener;
 import com.aokyu.dev.settings.provider.task.AbstractTask;
 import com.aokyu.dev.settings.provider.task.SerialExecutor;
 
+import android.content.ContentProvider;
 import android.content.ContentProviderOperation;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -29,10 +30,12 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * This class can access and modify preference data stored in the database.
- * This class can be used across multiple processes through the content provider.
- * TODO: Should implement a memory cache to reduce the time to access settings.
- *
+ * This class can access or modify primitive data stored in the database.
+ * Unlike the Android default implementation of {@link SharedPreferences},
+ * this class can be used across multiple processes since the {@link ContentProvider} is used for
+ * storing primitive data. Note that changes may not be applied for actual values yet,
+ * if changed values are accessed immediately from multiple processes after changing values.
+ * You should use {@link OnSharedPreferenceChangeListener} to observe changes for settings.
  * @see SettingsEditor
  */
 public class Settings implements SharedPreferences {
@@ -41,22 +44,42 @@ public class Settings implements SharedPreferences {
 
     private static volatile SharedPreferences sHelper;
 
+    /**
+     * The executor for editing actual values on the database.
+     * @see #onApply(Commit)
+     */
     private static volatile SerialExecutor sExecutor = new SerialExecutor(TASK_NAME);
 
     private Context mContext;
+
+    /**
+     * The memory cache for settings.
+     */
     private SettingsCache mCache;
 
+    /**
+     * The listener manager.
+     */
     private SettingsChangeListeners mChangeListeners;
 
+    /**
+     * Returns an implementation of {@link SharedPreferences} using {@link ContentProvider}.
+     * @param context The application context.
+     * @return an implementation of {@link SharedPreferences}.
+     */
     public static SharedPreferences getInstance(Context context) {
         if (sHelper == null) {
-            synchronized(Settings.class) {
+            synchronized (Settings.class) {
                 sHelper = new Settings(context);
             }
         }
         return sHelper;
     }
 
+    /**
+     * Create a new instance of {@link SharedPreferences}.
+     * @param context The application context.
+     */
     private Settings(Context context) {
         mContext = context;
         mCache = new SettingsCache(mContext);
@@ -186,6 +209,11 @@ public class Settings implements SharedPreferences {
         }
     }
 
+    /**
+     * This class holds {@link OnSharedPreferenceChangeListener}s and dispatches callbacks for
+     * changes of shared preferences.
+     * @see OnSharedPreferenceChangeListener
+     */
     public static final class SettingsChangeListeners implements CacheListener {
 
         private SharedPreferences mPreferences;
@@ -244,11 +272,22 @@ public class Settings implements SharedPreferences {
         return new SettingsEditor(mContext, this);
     }
 
+    /**
+     * Called when changes need to be applied to the database asynchronously.
+     * @param commit The commit to apply.
+     * @see Editor#apply()
+     */
     private void onApply(Commit commit) {
         commit.cache(mCache);
         sExecutor.execute(commit);
     }
 
+    /**
+     * Called when changes need to be applied to the database synchronously.
+     * @param commit The commit to apply.
+     * @return true if the new values were successfully written to the database.
+     * @see Editor#commit()
+     */
     private boolean onCommit(Commit commit) {
         try {
             commit.cache(mCache);
@@ -336,22 +375,73 @@ public class Settings implements SharedPreferences {
         }
     }
 
+    /**
+     * The edit operation types.
+     * @see Commit
+     */
+    private enum EditType {
+        /**
+         * The type for insert or update operations.
+         * @see InsertOrUpdate
+         */
+        INSERT_OR_UPDATE,
+
+        /**
+         * The type for remove operations.
+         * @see Remove
+         */
+        REMOVE,
+
+        /**
+         * The type for cleanup operations.
+         * @see Clear
+         */
+        CLEAR
+    }
+
+    /**
+     * A task to commit changes.
+     */
     private static final class Commit extends AbstractTask {
 
         private ContentResolver mContentResolver;
 
-        private List<Edit> mEdits = new ArrayList<Edit>();
-        private Clear mClear;
+        /**
+         * A cleanup task is treated distinctively from other tasks
+         * since the cleanup should be done first on this commit.
+         * @see Editor#clear()
+         */
+        private Clear mClearOperation;
 
+        /**
+         * Edit tasks excluding a cleanup task.
+         */
+        private List<Edit> mEditOperations = new ArrayList<Edit>();
+
+        /**
+         * Creates a new commit.
+         * @param context The application context used to get the {@link ContentResolver}.
+         */
         public Commit(Context context) {
             mContentResolver = context.getContentResolver();
         }
 
+        /**
+         * Adds an edit operation to this commit.
+         * @param edit An edit operation.
+         */
         public void add(Edit edit) {
-            if (edit instanceof InsertOrUpdate || edit instanceof Remove) {
-                mEdits.add(edit);
-            } else if (edit instanceof Clear) {
-                mClear = (Clear) edit;
+            EditType type = edit.getType();
+            switch (type) {
+                case INSERT_OR_UPDATE:
+                case REMOVE:
+                    mEditOperations.add(edit);
+                    break;
+                case CLEAR:
+                    mClearOperation = (Clear) edit;
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -360,46 +450,56 @@ public class Settings implements SharedPreferences {
          * {@link Editor#apply()} or {@link Editor#commit()}.
          */
         public void cache(SettingsCache cache) {
-            if (mClear != null) {
+            if (mClearOperation != null) {
                 cache.clear();
             }
 
-            if (!mEdits.isEmpty()) {
-                for (Edit edit : mEdits) {
-                    if (edit instanceof InsertOrUpdate) {
-                        InsertOrUpdate operation = (InsertOrUpdate) edit;
-                        String key = operation.getKey();
-                        Object value = operation.getValue();
-                        if (!TextUtils.isEmpty(key)) {
-                            cache.put(key, value);
+            for (Edit edit : mEditOperations) {
+                EditType type = edit.getType();
+                switch (type) {
+                    case INSERT_OR_UPDATE:
+                        InsertOrUpdate editOperation = (InsertOrUpdate) edit;
+                        String editKey = editOperation.getKey();
+                        Object editValue = editOperation.getValue();
+                        if (!TextUtils.isEmpty(editKey)) {
+                            cache.put(editKey, editValue);
                         }
-                    } else if (edit instanceof Remove) {
-                        Remove operation = (Remove) edit;
-                        String key = operation.getKey();
-                        if (!TextUtils.isEmpty(key)) {
-                            cache.remove(key);
+                        break;
+                    case REMOVE:
+                        Remove removeOperation = (Remove) edit;
+                        String removeKey = removeOperation.getKey();
+                        if (!TextUtils.isEmpty(removeKey)) {
+                            cache.remove(removeKey);
                         }
-                    }
+                        break;
+                    case CLEAR:
+                    default:
+                        break;
                 }
             }
         }
 
+        /**
+         * Executes this commit for the database.
+         */
         @Override
         public void execute() throws InterruptedException {
             ArrayList<ContentProviderOperation> operations =
                     new ArrayList<ContentProviderOperation>();
 
-            // The clearing operation should be done first.
-            if (mClear != null) {
-                ContentProviderOperation clearOperation = mClear.buildOperation();
-                if (clearOperation != null) {
-                    operations.add(clearOperation);
+            // The cleanup operation should be done first.
+            if (mClearOperation != null) {
+                ContentProviderOperation operation = mClearOperation.build();
+                if (operation != null) {
+                    operations.add(operation);
                 }
             }
 
-            List<ContentProviderOperation> editOperations = buildOperations(mEdits);
-            if (!editOperations.isEmpty()) {
-                operations.addAll(editOperations);
+            for (Edit edit : mEditOperations) {
+                ContentProviderOperation operation = edit.build();
+                if (operation != null) {
+                    operations.add(operation);
+                }
             }
 
             String authority = SettingsContract.CONTENT_URI.getAuthority();
@@ -409,26 +509,28 @@ public class Settings implements SharedPreferences {
             } catch (OperationApplicationException e) {
             }
         }
-
-        private List<ContentProviderOperation> buildOperations(List<? extends Edit> editList) {
-            List<ContentProviderOperation> operations = new ArrayList<ContentProviderOperation>();
-            for (Edit edit : editList) {
-                ContentProviderOperation operation = edit.buildOperation();
-                if (operation != null) {
-                    operations.add(operation);
-                }
-            }
-            return operations;
-        }
     }
 
+    /**
+     * An base operation class for editing.
+     */
     private static abstract class Edit {
 
         private static final Uri CONTENT_URI = SettingsContract.CONTENT_URI;
 
         protected ContentResolver mContentResolver;
 
-        public abstract ContentProviderOperation buildOperation();
+        /**
+         * Returns the type of this operation.
+         * @return the type of this operation.
+         */
+        public abstract EditType getType();
+
+        /**
+         * Returns a {@link ContentProviderOperation} for this operation.
+         * @return a {@link ContentProviderOperation} for this operation.
+         */
+        public abstract ContentProviderOperation build();
 
         public Edit(Context context) {
             mContentResolver = context.getContentResolver();
@@ -455,6 +557,9 @@ public class Settings implements SharedPreferences {
         }
     }
 
+    /**
+     * An insert or update operation to the database.
+     */
     private static final class InsertOrUpdate extends Edit {
 
         private ContentValues mValues;
@@ -470,7 +575,6 @@ public class Settings implements SharedPreferences {
                     return mValues.getAsString(SettingsContract.KEY);
                 }
             }
-
             return null;
         }
 
@@ -480,16 +584,20 @@ public class Settings implements SharedPreferences {
                     return mValues.get(SettingsContract.VALUE);
                 }
             }
-
             return null;
         }
 
+        @Override
+        public EditType getType() {
+            return EditType.INSERT_OR_UPDATE;
+        }
 
-        public ContentProviderOperation buildOperation() {
+        @Override
+        public ContentProviderOperation build() {
             String key = mValues.getAsString(SettingsContract.KEY);
             Cursor cursor = null;
             try {
-                cursor = SettingLoader.load(mContentResolver, key);
+                cursor = SettingsLoader.loadCursor(mContentResolver, key);
                 if (cursor == null) {
                     return null;
                 }
@@ -500,9 +608,8 @@ public class Settings implements SharedPreferences {
                 }
 
                 if (cursor.moveToNext()) {
-                    ContentValues values = new ContentValues();
-                    CursorUtils.cursorRowToContentValues(cursor, values);
-                    long id = values.getAsLong(SettingsContract._ID);
+                    Setting setting = Setting.cursorRowToSetting(cursor);
+                    long id = setting.getId();
                     String where = SettingsContract._ID + "=?";
                     String[] selectionArgs = new String[] { String.valueOf(id) };
                     return newUpdate(where, selectionArgs, mValues);
@@ -517,6 +624,9 @@ public class Settings implements SharedPreferences {
         }
     }
 
+    /**
+     * A removal operation to the database.
+     */
     private static final class Remove extends Edit {
 
         private String mKey;
@@ -530,14 +640,22 @@ public class Settings implements SharedPreferences {
             return mKey;
         }
 
+        @Override
+        public EditType getType() {
+            return EditType.REMOVE;
+        }
 
-        public ContentProviderOperation buildOperation() {
+        @Override
+        public ContentProviderOperation build() {
             String where = SettingsContract.KEY + "=?";
             String[] selectionArgs = new String[] { mKey };
             return newDelete(where, selectionArgs);
         }
     }
 
+    /**
+     * A cleanup operation to the database.
+     */
     private static class Clear extends Edit {
 
         public Clear(Context context) {
@@ -545,7 +663,12 @@ public class Settings implements SharedPreferences {
         }
 
         @Override
-        public ContentProviderOperation buildOperation() {
+        public EditType getType() {
+            return EditType.CLEAR;
+        }
+
+        @Override
+        public ContentProviderOperation build() {
             return newDelete(null, null);
         }
     }
