@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SettingsSample</string>
+    <string name="activity_name">SettingsActivity</string>
+    <string name="provider_name">SettingsProvider</string>
+
+    <string name="apple">APPLE</string>
+    <string name="orange">ORANGE</string>
+    <string name="banana">BANANA</string>
+
+    <string name="number_three">3</string>
+    <string name="number_five">5</string>
+    <string name="number_seven">7</string>
+</resources>
