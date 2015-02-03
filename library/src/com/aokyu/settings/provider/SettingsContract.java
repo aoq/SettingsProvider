@@ -11,6 +11,10 @@ import android.content.ContentResolver;
 import android.net.Uri;
 import android.provider.BaseColumns;
 
+/**
+ * The contract between the settings provider and applications.
+ * A row in the settings table can store any kind of a key-value pair.
+ */
 public final class SettingsContract implements BaseColumns {
 
     /**

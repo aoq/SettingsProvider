@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2015 Yu AOKI
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+
 package com.aokyu.settings;
 
 import com.aokyu.settings.provider.SettingsContract;
@@ -26,8 +33,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * However, the cache might not be synchronized if you immediately access
  * records after updating records.
  *
- * The cache is constructed through the change notifications of the {@link com.aokyu.settings.provider.SettingsProvider}.
- * That is, this cache depends on the implementation of the {@link com.aokyu.settings.provider.SettingsProvider}.
+ * The cache is constructed through the change notifications of
+ * the {@link com.aokyu.settings.provider.SettingsProvider}.
+ * That is, this cache depends on the implementation of
+ * the {@link com.aokyu.settings.provider.SettingsProvider}.
  * @see com.aokyu.settings.provider.SettingsProvider#notifyChange(Set)
  */
 /* package */ class SettingsCache {
@@ -62,14 +71,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
         mObserver = new SettingsObserver(mContext, this);
         mContentResolver.registerContentObserver(
                 SettingsContract.CONTENT_URI, true, mObserver);
-        startLodingFromDatabase();
+        startLoadingFromDatabase();
     }
 
     /**
      * Starts loading settings from the database.
      * Note that the operation will be executed asynchronously.
      */
-    private void startLodingFromDatabase() {
+    private void startLoadingFromDatabase() {
         synchronized (this) {
             mLoaded = false;
         }

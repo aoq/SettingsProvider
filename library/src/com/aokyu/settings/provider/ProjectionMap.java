@@ -24,6 +24,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * A convenience wrapper for a projection map.  Makes it easier to create and use projection maps.
+ */
 /* package */ class ProjectionMap extends HashMap<String, String> {
 
     private static final long serialVersionUID = -8476123354276291589L;
@@ -82,12 +85,12 @@ import java.util.Map;
 
     @Override
     public String put(String key, String value) {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("unsupported : should use the builder");
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends String> map) {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("unsupported : should use the builder");
     }
 
 }

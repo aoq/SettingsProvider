@@ -35,7 +35,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Unlike the Android default implementation of {@link SharedPreferences},
  * this class can be used across multiple processes since the {@link ContentProvider} is used for
  * storing primitive data. Note that changes may not be applied for actual values yet,
- * if changed values are accessed immediately from multiple processes after changing values.
+ * if changed values are accessed immediately from multiple processes at the moment of changing
+ * values.
  * You should use {@link OnSharedPreferenceChangeListener} to observe changes for settings.
  * @see SettingsEditor
  */

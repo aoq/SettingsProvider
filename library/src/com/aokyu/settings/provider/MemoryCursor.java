@@ -24,6 +24,9 @@ import android.database.AbstractWindowedCursor;
 import android.database.Cursor;
 import android.database.CursorWindow;
 
+/**
+ * Implementation of an in-memory cursor backed by a cursor window.
+ */
 /* package */ class MemoryCursor extends AbstractWindowedCursor {
 
     private final String[] mColumnNames;
@@ -38,7 +41,7 @@ import android.database.CursorWindow;
     }
 
     public void fillFromCursor(Cursor cursor) {
-        cursorFillWindow(cursor, 0, getWindow());
+        fillWindow(cursor, 0, getWindow());
     }
 
     @Override
@@ -55,7 +58,7 @@ import android.database.CursorWindow;
         }
     }
 
-    private void cursorFillWindow(final Cursor cursor, int position, final CursorWindow window) {
+    private void fillWindow(final Cursor cursor, int position, final CursorWindow window) {
         if (position < 0 || position >= cursor.getCount()) {
             return;
         }
