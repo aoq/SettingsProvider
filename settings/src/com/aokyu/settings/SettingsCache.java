@@ -63,14 +63,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
     /**
      * Create a new memory cache for settings.
      * Note that the cache becomes available after loading.
+     *
      * @param context The application context.
      */
     public SettingsCache(Context context) {
         mContext = context;
         mContentResolver = mContext.getContentResolver();
         mObserver = new SettingsObserver(mContext, this);
-        mContentResolver.registerContentObserver(
-                SettingsContract.CONTENT_URI, true, mObserver);
+        mContentResolver.registerContentObserver(SettingsContract.CONTENT_URI, true, mObserver);
         startLoadingFromDatabase();
     }
 

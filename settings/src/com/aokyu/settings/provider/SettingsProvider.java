@@ -50,6 +50,11 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
     private static final String SETTINGS_DATABASE_TAG = "settings";
 
     /**
+     * Indicates an invalid row ID.
+     */
+    private static final int INVALID_ID = -1;
+
+    /**
      * The maximum number of batch operations between yield points.
      */
     private static final int MAX_OPERATIONS_PER_YIELD_POINT = 500;
@@ -135,35 +140,25 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
         super.shutdown();
         mSettingsHelper.remove();
         mTransactionHolder.remove();
-
-    }
-
-    /**
-     * Returns the current transaction for the current thread.
-     * @return the current transaction for the current thread.
-     */
-    public Transaction getCurrentTransaction() {
-        return mTransactionHolder.get();
     }
 
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
             String sortOrder) {
         mSettingsHelper.set(mDatabaseHelper);
-        SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
+        SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
         final int match = sUriMatcher.match(uri);
-        setTablesProjectionMap(match, queryBuilder);
+        setTablesProjectionMap(match, builder);
         Cursor cursor = null;
         switch (match) {
             case SETTINGS:
-                cursor = querySetting(queryBuilder, projection, selection, selectionArgs,
-                        sortOrder);
+                cursor = querySetting(builder, projection, selection, selectionArgs, sortOrder);
                 break;
             case SETTINGS_ID:
                 String settingId = uri.getLastPathSegment();
                 selectionArgs = insertSelectionArg(selectionArgs, settingId);
-                queryBuilder.appendWhere(SettingsContract._ID + "=?");
-                cursor = querySetting(queryBuilder, projection, selection, selectionArgs,
+                builder.appendWhere(SettingsContract._ID + "=?");
+                cursor = querySetting(builder, projection, selection, selectionArgs,
                         sortOrder);
                 break;
             default:
@@ -178,24 +173,18 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
         return cursor;
     }
 
-    private Cursor querySetting(SQLiteQueryBuilder queryBuilder, String[] projection,
-            String selection, String[] selectionArgs, String sortOrder) {
+    private Cursor querySetting(SQLiteQueryBuilder builder, String[] projection, String selection,
+            String[] selectionArgs, String sortOrder) {
         DatabaseHelper helper = mSettingsHelper.get();
         SQLiteDatabase db = helper.getReadableDatabase();
-        Cursor cursor = queryBuilder.query(db, projection, selection, selectionArgs,
-                null, null, sortOrder, null);
+        Cursor cursor = builder.query(db, projection, selection, selectionArgs, null, null,
+                sortOrder, null);
 
         if (cursor == null) {
             return null;
         }
 
-        try {
-            MemoryCursor memoryCursor = new MemoryCursor(null, cursor.getColumnNames());
-            memoryCursor.fillFromCursor(cursor);
-            return memoryCursor;
-        } finally {
-            cursor.close();
-        }
+        return cursor;
     }
 
     /**
@@ -254,7 +243,7 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
     protected Uri insertInTransaction(Uri uri, ContentValues values) {
         final int match = sUriMatcher.match(uri);
-        long id = 0;
+        long id = INVALID_ID;
         switch (match) {
             case SETTINGS:
                 id = insertSetting(match, values);
@@ -265,13 +254,13 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
         if (id < 0) {
             return null;
-        } else {
-            return ContentUris.withAppendedId(uri, id);
         }
+
+        return ContentUris.withAppendedId(uri, id);
     }
 
     private long insertSetting(int match, ContentValues values) {
-        long settingId = 0;
+        long settingId = INVALID_ID;
         mValues.clear();
         mValues.putAll(values);
 
@@ -292,12 +281,12 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
         mSettingsHelper.set(mDatabaseHelper);
         Transaction transaction = startTransaction(false);
         try {
-            List<Uri> deleted = deleteInTransaction(uri, selection, selectionArgs);
+            List<Uri> deletedUris = deleteInTransaction(uri, selection, selectionArgs);
             int size = 0;
-            if (deleted != null) {
-                size = deleted.size();
-                if (size > 0) {
-                    transaction.markDirty(deleted);
+            if (deletedUris != null) {
+                size = deletedUris.size();
+                for (Uri deletedUri : deletedUris) {
+                    transaction.markDirty(deletedUri);
                 }
             }
             transaction.markSuccessful(false);
@@ -359,12 +348,12 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
         mSettingsHelper.set(mDatabaseHelper);
         Transaction transaction = startTransaction(false);
         try {
-            List<Uri> updated = updateInTransaction(uri, values, selection, selectionArgs);
+            List<Uri> updatedUris = updateInTransaction(uri, values, selection, selectionArgs);
             int size = 0;
-            if (updated != null) {
-                size = updated.size();
-                if (size > 0) {
-                    transaction.markDirty(updated);
+            if (updatedUris != null) {
+                size = updatedUris.size();
+                for (Uri updatedUri : updatedUris) {
+                    transaction.markDirty(updatedUri);
                 }
             }
             transaction.markSuccessful(false);
@@ -376,17 +365,17 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
     protected List<Uri> updateInTransaction(Uri uri, ContentValues values, String selection,
             String[] selectionArgs) {
-        SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
+        SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
         final int match = sUriMatcher.match(uri);
-        setTablesProjectionMap(match, queryBuilder);
+        setTablesProjectionMap(match, builder);
         switch (match) {
             case SETTINGS:
-                return updateSetting(queryBuilder, values, selection, selectionArgs);
+                return updateSetting(builder, values, selection, selectionArgs);
             case SETTINGS_ID:
                 String settingId = uri.getLastPathSegment();
                 selectionArgs = insertSelectionArg(selectionArgs, settingId);
-                queryBuilder.appendWhere(SettingsContract._ID + "=?");
-                return updateSetting(queryBuilder, values, selection, selectionArgs);
+                builder.appendWhere(SettingsContract._ID + "=?");
+                return updateSetting(builder, values, selection, selectionArgs);
             default:
                 break;
         }
@@ -394,7 +383,7 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
         return null;
     }
 
-    private List<Uri> updateSetting(SQLiteQueryBuilder queryBuilder, ContentValues values,
+    private List<Uri> updateSetting(SQLiteQueryBuilder builder, ContentValues values,
             String selection, String[] selectionArgs) {
         List<Uri> uris = new ArrayList<Uri>();
         mValues.clear();
@@ -404,8 +393,8 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
         DatabaseHelper helper = mSettingsHelper.get();
         SQLiteDatabase db = helper.getWritableDatabase();
-        Cursor cursor = queryBuilder.query(db, SettingsUpdateQuery.COLUMNS,
-                selection, selectionArgs, null, null, null, null);
+        Cursor cursor = builder.query(db, SettingsUpdateQuery.COLUMNS, selection, selectionArgs,
+                null, null, null, null);
 
         if (cursor == null) {
             return uris;
@@ -503,6 +492,7 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
     /**
      * Yields the transaction to let other threads run.
+     *
      * @param transaction The transaction to yield.
      * @return true if the transaction was yielded.
      * @see SQLiteDatabase#yieldIfContendedSafely(long)
@@ -514,15 +504,11 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
     /**
      * Notifies the registered observer that rows were changed.
+     *
      * @param dirtyUris The {@link Uri}s that were changed.
      */
     protected void notifyChange(Set<Uri> dirtyUris) {
-        if (dirtyUris == null) {
-            return;
-        }
-
-        int size = dirtyUris.size();
-        if (size == 0) {
+        if (dirtyUris == null || dirtyUris.isEmpty()) {
             return;
         }
 
@@ -546,21 +532,22 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
 
     /**
      * Sets a proper projection map to the {@link SQLiteQueryBuilder}.
+     *
      * @param match The code for matched node of a {@link Uri}.
-     * @param queryBuilder The {@link SQLiteQueryBuilder} to set a projection map.
+     * @param builder The {@link SQLiteQueryBuilder} to set a projection map.
      */
-    private void setTablesProjectionMap(int match, SQLiteQueryBuilder queryBuilder) {
+    private void setTablesProjectionMap(int match, SQLiteQueryBuilder builder) {
         switch (match) {
             case SETTINGS:
             case SETTINGS_ID:
                 final ProjectionMap settingsProjection = sSettingsProjectionMap;
-                queryBuilder.setTables(DatabaseHelper.Tables.SETTINGS);
-                queryBuilder.setProjectionMap(settingsProjection);
+                builder.setTables(DatabaseHelper.Tables.SETTINGS);
+                builder.setProjectionMap(settingsProjection);
                 break;
             default:
                 throw new IllegalStateException("projection map does not exist");
         }
-        queryBuilder.setStrict(true);
+        builder.setStrict(true);
     }
 
     private String[] insertSelectionArg(String[] selectionArgs, String arg) {
@@ -622,11 +609,11 @@ public class SettingsProvider extends ContentProvider implements SQLiteTransacti
             db.execSQL("DROP TABLE IF EXISTS " + Tables.SETTINGS);
             db.execSQL("CREATE TABLE " + Tables.SETTINGS +
                     " (" +
-                    SettingsContract._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    SettingsContract.KEY + " TEXT NOT NULL," +
-                    SettingsContract.TYPE + " TEXT NOT NULL," +
-                    SettingsContract.VALUE + " TEXT," +
-                    "UNIQUE (" + SettingsContract.KEY + ")" +
+                        SettingsContract._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        SettingsContract.KEY + " TEXT NOT NULL," +
+                        SettingsContract.TYPE + " TEXT NOT NULL," +
+                        SettingsContract.VALUE + " TEXT," +
+                        "UNIQUE (" + SettingsContract.KEY + ")" +
                     ");");
         }
 

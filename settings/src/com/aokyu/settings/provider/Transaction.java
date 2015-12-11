@@ -49,6 +49,7 @@ import java.util.Set;
 
     /**
      * Create a transaction.
+     *
      * @param batch The flag that indicates whether this transaction is a batch operation.
      */
     public Transaction(boolean batch) {
@@ -71,16 +72,11 @@ import java.util.Set;
     }
 
     public void markDirty(Uri uri) {
-        if (uri != null) {
-            mDirtyUris.add(uri);
+        if (uri == null) {
+            return;
         }
-        markDirty();
-    }
 
-    public void markDirty(List<Uri> uris) {
-        if (uris != null && !uris.isEmpty()) {
-            mDirtyUris.addAll(uris);
-        }
+        mDirtyUris.add(uri);
         markDirty();
     }
 

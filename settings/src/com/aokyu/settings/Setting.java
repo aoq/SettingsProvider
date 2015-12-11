@@ -66,6 +66,7 @@ import java.io.ObjectOutputStream;
     /**
      * Returns the {@link Setting} created from the current row of the {@link Cursor}.
      * Note that null fields are not read out.
+     *
      * @param cursor The {@link Cursor} indicating the row to convert a {@link Setting}.
      * @return the {@link Setting} created from the current row of the {@link Cursor}.
      */
@@ -101,6 +102,7 @@ import java.io.ObjectOutputStream;
 
     /**
      * Creates a new setting from the {@link ContentValues}.
+     *
      * @param values The {@link ContentValues}.
      */
     public Setting(ContentValues values) {
@@ -177,6 +179,7 @@ import java.io.ObjectOutputStream;
 
     /**
      * Creates a new setting for the key-value pair.
+     *
      * @param key The key of this setting.
      * @param value The value of this setting.
      */
@@ -201,6 +204,7 @@ import java.io.ObjectOutputStream;
 
     /**
      * Returns a {@link ContentValues} for this setting.
+     *
      * @return a {@link ContentValues} for this setting.
      */
     public ContentValues toContentValues() {
@@ -278,6 +282,7 @@ import java.io.ObjectOutputStream;
 
     /**
      * Compares the given key to the key of this setting.
+     *
      * @param key The key to compare the key of this setting with.
      * @return true if the given key is equal to the key of this setting.
      */

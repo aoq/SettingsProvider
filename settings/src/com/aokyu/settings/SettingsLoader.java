@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
     /**
      * Loads the {@link Cursor} of the {@link Uri}.
+     *
      * @param resolver The {@link ContentResolver}.
      * @param uri The {@link Uri} to use for the query.
      * @return the {@link Cursor} of the {@link Uri}.
@@ -50,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
     /**
      * Loads the {@link com.aokyu.settings.Setting} for the key.
+     *
      * @param resolver The {@link ContentResolver}.
      * @return the {@link com.aokyu.settings.Setting} for the key.
      */
@@ -83,6 +85,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
     /**
      * Loads the {@link Setting}s on the database.
+     *
      * @param resolver The {@link ContentResolver}.
      * @return the {@link Setting}s on the database.
      */
@@ -90,8 +93,7 @@ import java.util.concurrent.ConcurrentHashMap;
         Map<Uri, Setting> map = new ConcurrentHashMap<Uri, Setting>();
         Cursor cursor = null;
         try {
-            cursor = resolver.query(SettingsContract.CONTENT_URI, PROJECTION,
-                    null, null, null);
+            cursor = resolver.query(SettingsContract.CONTENT_URI, PROJECTION, null, null, null);
             if (cursor == null) {
                 return null;
             }
@@ -99,8 +101,7 @@ import java.util.concurrent.ConcurrentHashMap;
             while (cursor.moveToNext()) {
                 Setting setting = Setting.cursorRowToSetting(cursor);
                 long id = setting.getId();
-                Uri uri = Uri.withAppendedPath(SettingsContract.CONTENT_URI,
-                        String.valueOf(id));
+                Uri uri = Uri.withAppendedPath(SettingsContract.CONTENT_URI, String.valueOf(id));
                 map.put(uri, setting);
             }
         } finally {

@@ -66,6 +66,7 @@ public class Settings implements SharedPreferences {
 
     /**
      * Returns an implementation of {@link SharedPreferences} using {@link ContentProvider}.
+     *
      * @param context The application context.
      * @return an implementation of {@link SharedPreferences}.
      */
@@ -80,6 +81,7 @@ public class Settings implements SharedPreferences {
 
     /**
      * Create a new instance of {@link SharedPreferences}.
+     *
      * @param context The application context.
      */
     private Settings(Context context) {
@@ -214,6 +216,7 @@ public class Settings implements SharedPreferences {
     /**
      * This class holds {@link OnSharedPreferenceChangeListener}s and dispatches callbacks for
      * changes of shared preferences.
+     *
      * @see OnSharedPreferenceChangeListener
      */
     public static final class SettingsChangeListeners implements CacheListener {
@@ -276,6 +279,7 @@ public class Settings implements SharedPreferences {
 
     /**
      * Called when changes need to be applied to the database asynchronously.
+     *
      * @param commit The commit to apply.
      * @see Editor#apply()
      */
@@ -286,6 +290,7 @@ public class Settings implements SharedPreferences {
 
     /**
      * Called when changes need to be applied to the database synchronously.
+     *
      * @param commit The commit to apply.
      * @return true if the new values were successfully written to the database.
      * @see Editor#commit()
@@ -495,6 +500,7 @@ public class Settings implements SharedPreferences {
                 if (operation != null) {
                     operations.add(operation);
                 }
+                mClearOperation = null;
             }
 
             for (Edit edit : mEditOperations) {
@@ -503,6 +509,7 @@ public class Settings implements SharedPreferences {
                     operations.add(operation);
                 }
             }
+            mEditOperations.clear();
 
             String authority = SettingsContract.CONTENT_URI.getAuthority();
             try {
